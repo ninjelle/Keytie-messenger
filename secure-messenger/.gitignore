@@ -1,0 +1,31 @@
+# Rust
+/target/
+**/target/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+
+# Скомпилированное Rust-ядро
+*.so
+*.pyd
+*.dll
+
+# Среды разработки
+.vscode/
+.idea/
+
+# ОС
+.DS_Store
+Thumbs.db
+
+# Секреты и ключи
+*.key
+*.pem
+.env

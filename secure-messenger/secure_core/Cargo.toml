@@ -1,0 +1,21 @@
+[package]
+name = "secure_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+# Имя, под которым модуль импортируется в Python: import secure_core
+name = "secure_core"
+# cdylib нужен, чтобы получить динамическую библиотеку для Python
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.28", features = ["abi3-py39"] }
+
+# Криптопримитивы — раскомментируем на Дне 2:
+# x25519-dalek     = "2"
+# chacha20poly1305 = "0.10"
+# hkdf             = "0.12"
+# sha2             = "0.10"
+# zeroize          = "1"
+# rand             = "0.8"

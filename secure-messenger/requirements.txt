@@ -1,0 +1,16 @@
+# Серверная часть
+fastapi
+uvicorn[standard]
+
+# Клиент / GUI
+PyQt6
+
+# Сборка Rust-ядра
+maturin
+
+# Тесты
+pytest
+
+# Добавим на Дне 3 — эталонные библиотеки для сверки:
+# DoubleRatchet
+# X3DH
