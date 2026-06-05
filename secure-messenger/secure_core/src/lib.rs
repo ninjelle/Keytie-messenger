@@ -1,15 +1,72 @@
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
+use pyo3::exceptions::PyValueError;
+use x25519_dalek::{StaticSecret, PublicKey};
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+use hkdf::Hkdf;
 
-/// Простая проверка, что Rust-ядро собралось и доступно из Python.
-/// На Дне 2 здесь появятся настоящие криптофункции (DH, KDF, шифрование).
-#[pyfunction]
-fn hello() -> PyResult<String> {
-    Ok("Привет из Rust-ядра! Криптография на подходе.".to_string())
+type HmacSha256 = Hmac<Sha256>;
+
+fn to_key(bytes: &[u8]) -> PyResult<[u8; 32]> {
+    bytes
+        .try_into()
+        .map_err(|_| PyValueError::new_err("ключ должен быть длиной ровно 32 байта"))
 }
 
-/// Модуль Python. Имя функции должно совпадать с [lib].name в Cargo.toml.
+#[pyfunction]
+fn generate_keypair(py: Python<'_>) -> (Bound<'_, PyBytes>, Bound<'_, PyBytes>) {
+    let secret = StaticSecret::random();
+    let public = PublicKey::from(&secret);
+    (
+        PyBytes::new(py, &secret.to_bytes()),
+        PyBytes::new(py, public.as_bytes()),
+    )
+}
+
+#[pyfunction]
+fn dh<'py>(py: Python<'py>, private_key: &[u8], their_public: &[u8]) -> PyResult<Bound<'py, PyBytes>> {
+    let secret = StaticSecret::from(to_key(private_key)?);
+    let public = PublicKey::from(to_key(their_public)?);
+    let shared = secret.diffie_hellman(&public);
+    Ok(PyBytes::new(py, shared.as_bytes()))
+}
+
+#[pyfunction]
+fn kdf_ck<'py>(py: Python<'py>, chain_key: &[u8]) -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyBytes>)> {
+    let mut mac_mk = HmacSha256::new_from_slice(chain_key)
+        .map_err(|_| PyValueError::new_err("неверная длина ключа цепочки"))?;
+    mac_mk.update(&[0x01]);
+    let message_key = mac_mk.finalize().into_bytes();
+
+    let mut mac_ck = HmacSha256::new_from_slice(chain_key)
+        .map_err(|_| PyValueError::new_err("неверная длина ключа цепочки"))?;
+    mac_ck.update(&[0x02]);
+    let next_chain_key = mac_ck.finalize().into_bytes();
+
+    Ok((
+        PyBytes::new(py, next_chain_key.as_slice()),
+        PyBytes::new(py, message_key.as_slice()),
+    ))
+}
+
+#[pyfunction]
+fn kdf_rk<'py>(py: Python<'py>, root_key: &[u8], dh_output: &[u8]) -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyBytes>)> {
+    let hk = Hkdf::<Sha256>::new(Some(root_key), dh_output);
+    let mut okm = [0u8; 64];
+    hk.expand(b"DoubleRatchet", &mut okm)
+        .map_err(|_| PyValueError::new_err("ошибка HKDF"))?;
+    Ok((
+        PyBytes::new(py, &okm[..32]),
+        PyBytes::new(py, &okm[32..]),
+    ))
+}
+
 #[pymodule]
 fn secure_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(hello, m)?)?;
+    m.add_function(wrap_pyfunction!(generate_keypair, m)?)?;
+    m.add_function(wrap_pyfunction!(dh, m)?)?;
+    m.add_function(wrap_pyfunction!(kdf_ck, m)?)?;
+    m.add_function(wrap_pyfunction!(kdf_rk, m)?)?;
     Ok(())
 }

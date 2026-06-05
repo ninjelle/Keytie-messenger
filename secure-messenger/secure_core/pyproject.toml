@@ -4,6 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "secure_core"
+version = "0.1.0"
 requires-python = ">=3.9"
 description = "Rust-ядро криптоопераций для защищённого мессенджера"
 
