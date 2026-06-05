@@ -5,6 +5,8 @@ use x25519_dalek::{StaticSecret, PublicKey};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use hkdf::Hkdf;
+use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
+use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -34,12 +36,12 @@ fn dh<'py>(py: Python<'py>, private_key: &[u8], their_public: &[u8]) -> PyResult
 
 #[pyfunction]
 fn kdf_ck<'py>(py: Python<'py>, chain_key: &[u8]) -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyBytes>)> {
-    let mut mac_mk = HmacSha256::new_from_slice(chain_key)
+    let mut mac_mk = <HmacSha256 as Mac>::new_from_slice(chain_key)
         .map_err(|_| PyValueError::new_err("неверная длина ключа цепочки"))?;
     mac_mk.update(&[0x01]);
     let message_key = mac_mk.finalize().into_bytes();
 
-    let mut mac_ck = HmacSha256::new_from_slice(chain_key)
+    let mut mac_ck = <HmacSha256 as Mac>::new_from_slice(chain_key)
         .map_err(|_| PyValueError::new_err("неверная длина ключа цепочки"))?;
     mac_ck.update(&[0x02]);
     let next_chain_key = mac_ck.finalize().into_bytes();
@@ -62,11 +64,37 @@ fn kdf_rk<'py>(py: Python<'py>, root_key: &[u8], dh_output: &[u8]) -> PyResult<(
     ))
 }
 
+#[pyfunction]
+fn encrypt<'py>(py: Python<'py>, message_key: &[u8], plaintext: &[u8], associated_data: &[u8]) -> PyResult<Bound<'py, PyBytes>> {
+    let key_arr = to_key(message_key)?;
+    let cipher = ChaCha20Poly1305::new(Key::from_slice(&key_arr));
+    let nonce = Nonce::from_slice(&[0u8; 12]);
+    let payload = Payload { msg: plaintext, aad: associated_data };
+    let ciphertext = cipher
+        .encrypt(nonce, payload)
+        .map_err(|_| PyValueError::new_err("ошибка шифрования"))?;
+    Ok(PyBytes::new(py, &ciphertext))
+}
+
+#[pyfunction]
+fn decrypt<'py>(py: Python<'py>, message_key: &[u8], ciphertext: &[u8], associated_data: &[u8]) -> PyResult<Bound<'py, PyBytes>> {
+    let key_arr = to_key(message_key)?;
+    let cipher = ChaCha20Poly1305::new(Key::from_slice(&key_arr));
+    let nonce = Nonce::from_slice(&[0u8; 12]);
+    let payload = Payload { msg: ciphertext, aad: associated_data };
+    let plaintext = cipher
+        .decrypt(nonce, payload)
+        .map_err(|_| PyValueError::new_err("расшифровка не удалась: подмена данных или неверный ключ"))?;
+    Ok(PyBytes::new(py, &plaintext))
+}
+
 #[pymodule]
 fn secure_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(generate_keypair, m)?)?;
     m.add_function(wrap_pyfunction!(dh, m)?)?;
     m.add_function(wrap_pyfunction!(kdf_ck, m)?)?;
     m.add_function(wrap_pyfunction!(kdf_rk, m)?)?;
+    m.add_function(wrap_pyfunction!(encrypt, m)?)?;
+    m.add_function(wrap_pyfunction!(decrypt, m)?)?;
     Ok(())
 }
