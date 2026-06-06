@@ -31,3 +31,7 @@ Thumbs.db
 .env
 
 *.db
+
+.coverage
+htmlcov/
+.pytest_cache/
