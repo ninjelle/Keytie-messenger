@@ -88,6 +88,16 @@ fn decrypt<'py>(py: Python<'py>, message_key: &[u8], ciphertext: &[u8], associat
     Ok(PyBytes::new(py, &plaintext))
 }
 
+#[pyfunction]
+fn kdf_sk<'py>(py: Python<'py>, key_material: &[u8]) -> PyResult<Bound<'py, PyBytes>> {
+    let salt = [0u8; 32];
+    let hk = Hkdf::<Sha256>::new(Some(&salt), key_material);
+    let mut okm = [0u8; 32];
+    hk.expand(b"X3DH", &mut okm)
+        .map_err(|_| PyValueError::new_err("ошибка HKDF"))?;
+    Ok(PyBytes::new(py, &okm))
+}
+
 #[pymodule]
 fn secure_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(generate_keypair, m)?)?;
@@ -96,5 +106,6 @@ fn secure_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(kdf_rk, m)?)?;
     m.add_function(wrap_pyfunction!(encrypt, m)?)?;
     m.add_function(wrap_pyfunction!(decrypt, m)?)?;
+    m.add_function(wrap_pyfunction!(kdf_sk, m)?)?;
     Ok(())
 }
