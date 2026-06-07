@@ -57,7 +57,7 @@ class ChatWindow(QWidget):
         self.setStyleSheet(STYLE)
         self.resize(420, 560)
 
-        title = QLabel("Keytie 💗")
+        title = QLabel("Keytie")
         title.setObjectName("title")
 
         self.me_input = QLineEdit()
