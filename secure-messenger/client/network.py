@@ -24,10 +24,10 @@ class Messenger:
     def register(self):
         pub = self.bundle.public_bundle()
         body = {"ik": _b64(pub["ik"]), "spk": _b64(pub["spk"]), "opk": _b64(pub["opk"])}
-        requests.post(f"{self.server_url}/register/{self.username}", json=body)
+        requests.post(f"{self.server_url}/register/{self.username}", json=body, timeout=5)
 
     def _start_session(self, peer):
-        response = requests.get(f"{self.server_url}/bundle/{peer}")
+        response = requests.get(f"{self.server_url}/bundle/{peer}", timeout=5)
         raw = response.json()
         peer_bundle = {
             "ik": _unb64(raw["ik"]),
@@ -54,10 +54,10 @@ class Messenger:
             envelope["ik_pub"] = _b64(self.bundle.ik_pub)
             envelope["ek_pub"] = _b64(session["ek_pub"])
             session["first"] = False
-        requests.post(f"{self.server_url}/send/{peer}", json=envelope)
+        requests.post(f"{self.server_url}/send/{peer}", json=envelope, timeout=5)
 
     def receive(self):
-        response = requests.get(f"{self.server_url}/messages/{self.username}")
+        response = requests.get(f"{self.server_url}/messages/{self.username}", timeout=5)
         result = []
         for env in response.json():
             sender = env["sender"]
