@@ -1,0 +1,37 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tools
+        run: pip install maturin pytest pytest-cov
+      - name: Build and install Rust core
+        run: |
+          maturin build --release --manifest-path secure-messenger/secure_core/Cargo.toml --out dist
+          pip install dist/*.whl
+      - name: Run tests
+        run: |
+          cd secure-messenger/client
+          pytest -v
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install security tools
+        run: pip install bandit pip-audit
+      - name: SAST (bandit)
+        run: bandit -r secure-messenger/client secure-messenger/server -x secure-messenger/client/tests -ll
+      - name: SCA (pip-audit)
+        continue-on-error: true
+        run: pip-audit
