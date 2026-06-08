@@ -38,7 +38,7 @@ class Messenger:
         ratchet = DoubleRatchet.init_alice(shared_key, peer_bundle["spk"])
         self.sessions[peer] = {"ratchet": ratchet, "first": True, "ek_pub": ek_pub}
 
-    def send(self, peer, text):
+    def send(self, peer, text, group=None):
         if peer not in self.sessions:
             self._start_session(peer)
         session = self.sessions[peer]
@@ -50,11 +50,18 @@ class Messenger:
             "n": header.n,
             "ciphertext": _b64(ciphertext),
         }
+        if group is not None:
+            envelope["group"] = group
         if session["first"]:
             envelope["ik_pub"] = _b64(self.bundle.ik_pub)
             envelope["ek_pub"] = _b64(session["ek_pub"])
             session["first"] = False
         requests.post(f"{self.server_url}/send/{peer}", json=envelope, timeout=5)
+
+    def send_group(self, group, members, text):
+        for member in members:
+            if member != self.username:
+                self.send(member, text, group=group)
 
     def receive(self):
         response = requests.get(f"{self.server_url}/messages/{self.username}", timeout=5)
@@ -67,5 +74,5 @@ class Messenger:
                 self.sessions[sender] = {"ratchet": ratchet, "first": False, "ek_pub": None}
             header = Header(_unb64(env["dh_pub"]), env["pn"], env["n"])
             plaintext = self.sessions[sender]["ratchet"].decrypt(header, _unb64(env["ciphertext"]))
-            result.append((sender, plaintext.decode()))
+            result.append((sender, plaintext.decode(), env.get("group")))
         return result

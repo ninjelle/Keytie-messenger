@@ -51,7 +51,8 @@ class ChatWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.messenger = None
-        self.peer = None
+        self.recipients = []
+        self.group = None
 
         self.setWindowTitle("Keytie")
         self.setStyleSheet(STYLE)
@@ -63,7 +64,7 @@ class ChatWindow(QWidget):
         self.me_input = QLineEdit()
         self.me_input.setPlaceholderText("Моё имя")
         self.peer_input = QLineEdit()
-        self.peer_input.setPlaceholderText("Собеседник")
+        self.peer_input.setPlaceholderText("Собеседник или участники через запятую")
         self.connect_button = QPushButton("Подключиться")
         self.connect_button.clicked.connect(self.start_chat)
 
@@ -98,11 +99,18 @@ class ChatWindow(QWidget):
     def start_chat(self):
         self.messenger = Messenger(self.me_input.text())
         self.messenger.register()
-        self.peer = self.peer_input.text()
+        self.recipients = [p.strip() for p in self.peer_input.text().split(",") if p.strip()]
+        if len(self.recipients) > 1:
+            self.group = ", ".join(sorted(self.recipients + [self.messenger.username]))
+        else:
+            self.group = None
         self.me_input.setEnabled(False)
         self.peer_input.setEnabled(False)
         self.connect_button.setEnabled(False)
-        self.chat_log.append(f"<i>Подключено как {self.messenger.username}</i>")
+        if self.group:
+            self.chat_log.append(f"<i>Подключено как {self.messenger.username} — группа: {self.group}</i>")
+        else:
+            self.chat_log.append(f"<i>Подключено как {self.messenger.username}</i>")
         self.timer.start(1000)
 
     def send(self):
@@ -110,19 +118,25 @@ class ChatWindow(QWidget):
         if not text or self.messenger is None:
             return
         try:
-            self.messenger.send(self.peer, text)
-            self.chat_log.append(f"<b style='color:#C2185B'>Я:</b> {text}")
+            if self.group:
+                self.messenger.send_group(self.group, self.recipients, text)
+                self.chat_log.append(f"<b style='color:#C2185B'>Я → группа:</b> {text}")
+            else:
+                self.messenger.send(self.recipients[0], text)
+                self.chat_log.append(f"<b style='color:#C2185B'>Я:</b> {text}")
             self.message_input.clear()
         except Exception:
-            self.chat_log.append("<i>Собеседник ещё не подключился</i>")
+            self.chat_log.append("<i>Кто-то из участников ещё не подключился</i>")
 
     def poll(self):
         try:
-            for sender, text in self.messenger.receive():
-                self.chat_log.append(f"<b style='color:#8E24AA'>{sender}:</b> {text}")
+            for sender, text, group in self.messenger.receive():
+                if group:
+                    self.chat_log.append(f"<b style='color:#8E24AA'>{sender} (группа):</b> {text}")
+                else:
+                    self.chat_log.append(f"<b style='color:#8E24AA'>{sender}:</b> {text}")
         except Exception:
             pass
-
 
 def main():
     app = QApplication(sys.argv)

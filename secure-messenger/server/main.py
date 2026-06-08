@@ -45,6 +45,7 @@ class Envelope(BaseModel):
     pn: int
     n: int
     ciphertext: str
+    group: Optional[str] = None
 
 
 @app.post("/register/{username}")
