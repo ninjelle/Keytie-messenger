@@ -24,6 +24,7 @@
 Keytie-messenger/
 ├── .github/workflows/ci.yml      конвейер непрерывной интеграции (CI/CD)
 ├── README.md
+├── КП_МИТП_ПояснительнаяЗаписка  пояснительная записка к курсовой работе
 └── secure-messenger/
     ├── secure_core/              Rust-ядро криптографических операций
     │   ├── src/lib.rs
